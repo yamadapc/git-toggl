@@ -1,0 +1,27 @@
+name:                git-toggl
+version:             0.1.0.0
+synopsis:            Track time spend making a commit with Toggl
+description:
+  This is a command-line tool for tracking development time with Toggl.
+  For more information, see our GitHub page.
+license:             MIT
+license-file:        LICENSE
+author:              Pedro Tacla Yamada
+maintainer:          tacla.yamada@gmail.com
+copyright:           (c) 2015 Pedro Tacla Yamada
+category:            System
+build-type:          Simple
+extra-source-files:  README.md
+                   , LICENSE
+cabal-version:       >=1.10
+
+executable git-toggl
+  main-is:             Main.hs
+  build-depends:       base >=4.7 && <4.8
+                     , directory
+                     , filepath
+                     , hourglass >= 0.2 && < 1
+                     , optparse-applicative
+                     , wreq >= 0.3 && < 0.4
+  hs-source-dirs:      src
+  default-language:    Haskell2010
