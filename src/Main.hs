@@ -31,16 +31,18 @@ main = do
     run (Init (Just pth)) = writeCurrent pth
     run Login = loginToggl
     opts = info (helper <*> togglOpts) $
-               fullDesc <> progDesc "usage: git-toggl <command> [<args>]"
+               fullDesc <> progDesc ("Try running `git-toggl` init and " ++
+                                     "making a commit")
                         <> header "git-toggl - Toggl Time Tracking for Git"
 
 togglOpts :: Parser Options
 togglOpts = subparser ( command "init" (info initC
-                  ( progDesc "" ))
+                  ( progDesc "Sets-up everything and starts a new time entry" ))
            <> command "login" (info loginC
-                  ( progDesc "" ))
+                  ( progDesc "Walks you through logging-in to Toggl" ))
            <> command "prepare-commit-msg" (info prepareC
-                  ( progDesc "" ))
+                  ( progDesc ("If a `current` time entry exists," ++
+                              " mentions it on the COmmiT_MSG")))
             )
   where
     prepareC = PrepareCommitMsg <$> argument str ( metavar "COMMIT_FILE" )
@@ -57,9 +59,10 @@ loginToggl = do
     case mcached of
         Just (_, fp) -> putStrLn $ "(cached token found at " ++ fp ++ ")"
         Nothing -> do
-            putStrLn "(not found)"
-            putStrLn "Your token is available on this link:"
-            putStrLn "    https://toggl.com/app/profile"
+            putStrLn $
+                "(not found)\n" ++
+                "Your token is available on this link:\n" ++
+                "    https://toggl.com/app/profile"
             execOpen "https://toggl.com/app/profile"
             putStr "token: "
             token <- getLine
@@ -123,10 +126,10 @@ prepareCommit cpth = mstartIO >>= \case
 
 writeCurrent :: FilePath -> IO ()
 writeCurrent pth = do
-    t <- timePrint ISO8601_DateAndTime <$> timeCurrent
-    putStrLn $ "Writting timestamp to `" ++ target ++ "` (" ++ t ++ ")"
+    stime <- localTimePrint ISO8601_DateAndTime <$> localDateCurrent
+    putStrLn $ "Writting timestamp to `" ++ target ++ "` (" ++ stime ++ ")"
     createDirectoryIfMissing True dir
-    writeFile target t
+    writeFile target stime
   where
     dir = pth </> "toggl"
     target = dir </> "current"
