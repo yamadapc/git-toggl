@@ -1,8 +1,9 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
-import Control.Monad (when)
+import Control.Monad (unless, when)
 import Data.Hourglass
 import Data.Int
+import Data.List
 import Options.Applicative
 import System.Directory
 import System.Exit
@@ -28,7 +29,7 @@ main = do
     run (Init Nothing) = gitRepositoryPth >>= \case
         Nothing -> notInAGitRepository
         Just pth -> run (Init (Just pth))
-    run (Init (Just pth)) = writeCurrent pth
+    run (Init (Just pth)) = ensureSetup pth >> writeCurrent pth
     run (Clean Nothing) = gitRepositoryPth >>= \case
         Nothing -> notInAGitRepository
         Just pth -> run (Clean (Just pth))
@@ -94,6 +95,26 @@ execOpen t = do
             hPutStrLn stderr $
                 "Command `" ++ cmd ++ "` failed with: " ++ show i
         ExitSuccess -> return ()
+
+ensureSetup :: FilePath -> IO ()
+ensureSetup pth = do
+    plantGitHook pth "commit-msg"
+    plantGitHook pth "prepare-commit-msg"
+
+plantGitHook :: FilePath -> String -> IO ()
+plantGitHook pth name = doesFileExist hookPth >>= \exists ->
+   if exists
+       then do
+           putStrLn $ "Hook " ++ hookPth ++ " already exists"
+           hook <- readFile hookPth
+           unless (("git-toggl " ++ name) `isInfixOf` hook) $
+               putStrLn $ "Please add the following to the existing hook:\n" ++
+                          "`git-toggl " ++ name ++ "`"
+       else do
+           putStrLn $ "Writting git-toggl `" ++ name ++ "` hook to " ++ hookPth
+           writeFile hookPth ("#!/bin/sh\ngit-toggl " ++ name)
+  where
+    hookPth = pth </> "hooks" </> name
 
 findCachedAuth :: IO (Maybe (TogglAuth, FilePath))
 findCachedAuth = do
