@@ -31,7 +31,7 @@ main = do
         Nothing -> notInAGitRepository
         Just pth -> run (Init (Just pth))
     run (Init (Just pth)) = ensureSetup pth >> writeCurrent pth
-    run (CommitMsg cpth) = undefined
+    run (CommitMsg _) = return ()
     run (Clean Nothing) = gitRepositoryPth >>= \case
         Nothing -> notInAGitRepository
         Just pth -> run (Clean (Just pth))
