@@ -52,7 +52,7 @@ togglOpts = subparser ( command "init" (info initC
                   ( progDesc "Walks you through logging-in to Toggl" ))
            <> command "prepare-commit-msg" (info prepareC
                   ( progDesc ("If a `current` time entry exists," ++
-                              " mentions it on the COmmiT_MSG")))
+                              " mentions it on the COMMIT_MSG")))
             )
   where
     prepareC = PrepareCommitMsg <$> argument str ( metavar "COMMIT_FILE" )
