@@ -118,7 +118,7 @@ plantGitHook pth name = doesFileExist hookPth >>= \exists ->
                           "`git-toggl " ++ name ++ "`"
        else do
            putStrLn $ "Writting git-toggl `" ++ name ++ "` hook to " ++ hookPth
-           writeFile hookPth ("#!/bin/sh\ngit-toggl " ++ name)
+           writeFile hookPth ("#!/bin/sh\ngit-toggl " ++ name ++ " $1")
   where
     hookPth = pth </> "hooks" </> name
 
