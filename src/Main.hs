@@ -60,7 +60,7 @@ togglOpts = subparser ( command "init" (info initC
                               "API submission.")))
             )
   where
-    commitMsgC = CommigMsg <$> argument str ( metavar "COMMIT_FILE" )
+    commitMsgC = CommitMsg <$> argument str ( metavar "COMMIT_FILE" )
     prepareC = PrepareCommitMsg <$> argument str ( metavar "COMMIT_FILE" )
     initC = Init <$> optional (strOption
                ( long "path"
