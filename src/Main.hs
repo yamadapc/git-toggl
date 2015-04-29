@@ -13,6 +13,7 @@ import System.Process
 data TogglAuth = Token String
 
 data Options = Init (Maybe FilePath)
+             | Clean (Maybe FilePath)
              | PrepareCommitMsg FilePath
              | Login
 
@@ -22,14 +23,19 @@ main = do
     hSetBuffering stderr NoBuffering
     execParser opts >>= run
   where
-    run (PrepareCommitMsg cpth) = prepareCommit cpth
+    run (PrepareCommitMsg cpth) = prepareCommit cpth >> run (Clean Nothing)
     run (Init Nothing) = gitRepositoryPth >>= \case
-        Nothing -> do
-            hPutStrLn stderr "Not in a git repository"
-            exitWith (ExitFailure 1)
+        Nothing -> notInAGitRepository
         Just pth -> run (Init (Just pth))
     run (Init (Just pth)) = writeCurrent pth
+    run (Clean Nothing) = gitRepositoryPth >>= \case
+        Nothing -> notInAGitRepository
+        Just pth -> run (Clean (Just pth))
+    run (Clean (Just pth)) = removeCurrent pth
     run Login = loginToggl
+    notInAGitRepository = do
+        hPutStrLn stderr "Not in a git repository"
+        exitWith (ExitFailure 1)
     opts = info (helper <*> togglOpts) $
                fullDesc <> progDesc ("Try running `git-toggl` init and " ++
                                      "making a commit")
@@ -38,6 +44,8 @@ main = do
 togglOpts :: Parser Options
 togglOpts = subparser ( command "init" (info initC
                   ( progDesc "Sets-up everything and starts a new time entry" ))
+           <> command "clean" (info cleanC
+                  ( progDesc "Walks you through logging-in to Toggl" ))
            <> command "login" (info loginC
                   ( progDesc "Walks you through logging-in to Toggl" ))
            <> command "prepare-commit-msg" (info prepareC
@@ -48,8 +56,12 @@ togglOpts = subparser ( command "init" (info initC
     prepareC = PrepareCommitMsg <$> argument str ( metavar "COMMIT_FILE" )
     initC = Init <$> optional (strOption
                ( long "path"
-              <> metavar "FILE"
+              <> metavar "DIR"
               <> help "Where your git repository is located" ))
+    cleanC = Clean <$> optional (strOption
+               ( long "path"
+              <> metavar "DIR"
+              <> help "Where your git repository is located"))
     loginC = pure Login
 
 loginToggl :: IO ()
@@ -133,6 +145,16 @@ writeCurrent pth = do
   where
     dir = pth </> "toggl"
     target = dir </> "current"
+
+removeCurrent :: FilePath -> IO ()
+removeCurrent pth = doesFileExist target >>= \exists ->
+    if exists
+        then do
+            putStrLn $ "Removing timestamp at " ++ target
+            removeFile target
+        else putStrLn "No timestamp to remove"
+  where
+    target = pth </> "toggl" </> "current"
 
 gitRepositoryPth :: IO (Maybe FilePath)
 gitRepositoryPth = getCurrentDirectory >>= findGit
