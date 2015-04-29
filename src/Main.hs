@@ -17,6 +17,7 @@ data TogglAuth = Token String
 data Options = Init (Maybe FilePath)
              | Clean (Maybe FilePath)
              | PrepareCommitMsg FilePath
+             | CommitMsg FilePath
              | Login
 
 main :: IO ()
@@ -25,11 +26,12 @@ main = do
     hSetBuffering stderr NoBuffering
     execParser opts >>= run
   where
-    run (PrepareCommitMsg cpth) = prepareCommit cpth >> run (Clean Nothing)
+    run (PrepareCommitMsg cpth) = prepareCommit cpth
     run (Init Nothing) = gitRepositoryPth >>= \case
         Nothing -> notInAGitRepository
         Just pth -> run (Init (Just pth))
     run (Init (Just pth)) = ensureSetup pth >> writeCurrent pth
+    run (CommitMsg cpth) = undefined
     run (Clean Nothing) = gitRepositoryPth >>= \case
         Nothing -> notInAGitRepository
         Just pth -> run (Clean (Just pth))
@@ -53,8 +55,12 @@ togglOpts = subparser ( command "init" (info initC
            <> command "prepare-commit-msg" (info prepareC
                   ( progDesc ("If a `current` time entry exists," ++
                               " mentions it on the COMMIT_MSG")))
+           <> command "commit-msg" (info commitMsgC
+                  ( progDesc ("Caches the last timed commit for later Toggl " ++
+                              "API submission.")))
             )
   where
+    commitMsgC = CommigMsg <$> argument str ( metavar "COMMIT_FILE" )
     prepareC = PrepareCommitMsg <$> argument str ( metavar "COMMIT_FILE" )
     initC = Init <$> optional (strOption
                ( long "path"
