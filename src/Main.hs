@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
+import Control.Monad (when)
 import Data.Hourglass
 import Data.Int
 import Options.Applicative
@@ -122,15 +123,16 @@ findCacheFile start = doesFileExist tok >>= \exists ->
     tok = start </> "token"
 
 prepareCommit :: FilePath -> IO ()
-prepareCommit cpth = mstartIO >>= \case
-    Nothing -> do
-        hPutStrLn stderr ("Couldn't parse " ++ target)
-        exitWith (ExitFailure 1)
-    Just start -> do
-        stop <- timeCurrent
-        let (duration, _) = fromSeconds (timeDiff stop start)
-            sduration = printDuration duration
-        appendFile cpth sduration
+prepareCommit cpth = doesFileExist target >>= \exists ->
+    when exists $ mstartIO >>= \case
+        Nothing -> do
+            hPutStrLn stderr ("Couldn't parse " ++ target)
+            exitWith (ExitFailure 1)
+        Just start -> do
+            stop <- timeCurrent
+            let (duration, _) = fromSeconds (timeDiff stop start)
+                sduration = printDuration duration
+            appendFile cpth sduration
   where
     dir = takeDirectory cpth </> "toggl"
     target = dir </> "current"
