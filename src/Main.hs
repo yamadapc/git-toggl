@@ -119,6 +119,8 @@ plantGitHook pth name = doesFileExist hookPth >>= \exists ->
        else do
            putStrLn $ "Writting git-toggl `" ++ name ++ "` hook to " ++ hookPth
            writeFile hookPth ("#!/bin/sh\ngit-toggl " ++ name ++ " $1")
+           perms <- getPermissions hookPth
+           setPermissions hookPth (setOwnerExecutable True perms)
   where
     hookPth = pth </> "hooks" </> name
 
