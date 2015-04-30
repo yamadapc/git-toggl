@@ -8,9 +8,9 @@ import qualified Data.ByteString.Lazy as ByteStringL
 import qualified Data.ByteString as ByteStringS
 import Data.Hourglass
 import Data.Int
-import Data.List
+import Data.List (isInfixOf)
 import Data.Text (Text, unpack)
-import qualified Data.Text as Text (lines)
+import qualified Data.Text as Text (lines, words)
 import Options.Applicative hiding (Parser)
 import qualified Options.Applicative as Options (Parser)
 import System.Directory
@@ -236,10 +236,11 @@ getLastCommit gitPth start = do
     case code of
         ExitSuccess ->
             case parseOnly commitMsgParser msg of
-                Left _ -> do
+                Left x -> do
+                    print x
                     hPutStrLn stderr "Failed to parse last commit message"
                     exitWith (ExitFailure 1)
-                Right (sha, author, stop, message) ->
+                Right (sha, author, stop, message) -> do
                     return Commit { commitRepository = Just (GithubRepository gitPth)
                                   , commitStart = start
                                   , commitStop = stop
@@ -257,17 +258,22 @@ commitMsgParser :: Parser (Text, Text, LocalTime DateTime, Text)
 commitMsgParser = do
     _ <- string "commit "
     sha <- takeLine
-    _ <- endOfLine
+    endOfLine
     _ <- string "Author: "
     author <- takeLine
+    endOfLine
     _ <- string "Date:   "
     sstop <- takeLine
+    endOfLine
     message <- consumePadded
-    case localTimeParse ISO8601_DateAndTime (unpack sstop) of
+    case localTimeParse ISO8601_DateAndTime (fixGitDate (unpack sstop)) of
         Nothing -> fail "Failed to parse"
         Just stop -> return (sha, author, stop, message)
   where
     takeLine = takeTill isEndOfLine
+    fixGitDate ds = let [d, t, tz] = words ds
+                      in d ++ "T" ++ t ++
+                         Prelude.take 3 tz ++ ":" ++ Prelude.drop 3 tz
     consumePadded = do
         skipSpace
         takeLine
