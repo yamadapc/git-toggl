@@ -183,7 +183,7 @@ writeCurrent pth = do
     target = dir </> "current"
 
 persistCurrent :: FilePath -> IO ()
-persistCurrent pth = do
+persistCurrent cpth = do
     mstart <- timeParse ISO8601_DateAndTime <$> readFile currentPth
     case mstart of
         Nothing -> do
@@ -193,7 +193,7 @@ persistCurrent pth = do
             commit <- getLastCommit start
             ByteString.writeFile (commitSha commit) (encode commit)
   where
-    currentPth = pth </> "toggl" </> "current"
+    currentPth = takeDirectory cpth </> "toggl" </> "current"
 
 data Commit = Commit { commitStart :: DateTime
                      , commitStop :: DateTime
