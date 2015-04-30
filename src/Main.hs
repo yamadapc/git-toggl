@@ -40,7 +40,9 @@ main = do
         Nothing -> notInAGitRepository
         Just pth -> run (Init (Just pth))
     run (Init (Just pth)) = ensureSetup pth >> writeCurrent pth
-    run (CommitMsg pth) = persistCurrent pth
+    run (CommitMsg pth) = do
+        persistCurrent pth
+        run (Clean (Just (takeDirectory pth)))
     run (Clean Nothing) = gitRepositoryPth >>= \case
         Nothing -> notInAGitRepository
         Just pth -> run (Clean (Just pth))
