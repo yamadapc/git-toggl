@@ -197,9 +197,12 @@ persistCurrent cpth = do
             exitWith (ExitFailure 1)
         Just start -> do
             commit <- getLastCommit currentPth start
-            ByteStringL.writeFile (unpack (commitSha commit)) (encode commit)
+            ByteStringL.writeFile
+                (dir </> unpack (commitSha commit))
+                (encode commit)
   where
-    currentPth = takeDirectory cpth </> "toggl" </> "current"
+    dir = takeDirectory cpth </> "toggl"
+    currentPth = dir </> "current"
 
 data Commit = Commit { commitStart :: LocalTime DateTime
                      , commitStop :: LocalTime DateTime
@@ -240,7 +243,7 @@ getLastCommit gitPth start = do
                     print x
                     hPutStrLn stderr "Failed to parse last commit message"
                     exitWith (ExitFailure 1)
-                Right (sha, author, stop, message) -> do
+                Right (sha, author, stop, message) ->
                     return Commit { commitRepository = Just (GithubRepository gitPth)
                                   , commitStart = start
                                   , commitStop = stop
