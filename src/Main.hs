@@ -1,6 +1,9 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 import Control.Monad (unless, when)
+import Data.Aeson
+import qualified Data.ByteString.Lazy as ByteString
 import Data.Hourglass
 import Data.Int
 import Data.List
@@ -31,7 +34,7 @@ main = do
         Nothing -> notInAGitRepository
         Just pth -> run (Init (Just pth))
     run (Init (Just pth)) = ensureSetup pth >> writeCurrent pth
-    run (CommitMsg _) = return ()
+    run (CommitMsg pth) = persistCurrent pth
     run (Clean Nothing) = gitRepositoryPth >>= \case
         Nothing -> notInAGitRepository
         Just pth -> run (Clean (Just pth))
@@ -41,7 +44,7 @@ main = do
         hPutStrLn stderr "Not in a git repository"
         exitWith (ExitFailure 1)
     opts = info (helper <*> togglOpts) $
-               fullDesc <> progDesc ("Try running `git-toggl` init and " ++
+               fullDesc <> progDesc ("Try running `git-toggl init` and " ++
                                      "making a commit")
                         <> header "git-toggl - Toggl Time Tracking for Git"
 
@@ -152,8 +155,11 @@ findCacheFile start = doesFileExist tok >>= \exists ->
     tok = start </> "token"
 
 prepareCommit :: FilePath -> IO ()
-prepareCommit cpth = doesFileExist target >>= \exists ->
-    when exists $ mstartIO >>= \case
+prepareCommit cpth = doesFileExist target >>= \exists -> do
+    mstart <- timeParse ISO8601_DateAndTime <$>
+                readFile target
+
+    when exists $ case mstart of
         Nothing -> do
             hPutStrLn stderr ("Couldn't parse " ++ target)
             exitWith (ExitFailure 1)
@@ -165,7 +171,6 @@ prepareCommit cpth = doesFileExist target >>= \exists ->
   where
     dir = takeDirectory cpth </> "toggl"
     target = dir </> "current"
-    mstartIO = timeParse ISO8601_DateAndTime <$> readFile target
 
 writeCurrent :: FilePath -> IO ()
 writeCurrent pth = do
@@ -176,6 +181,52 @@ writeCurrent pth = do
   where
     dir = pth </> "toggl"
     target = dir </> "current"
+
+persistCurrent :: FilePath -> IO ()
+persistCurrent pth = do
+    mstart <- timeParse ISO8601_DateAndTime <$> readFile currentPth
+    case mstart of
+        Nothing -> do
+            hPutStrLn stderr ("Couldn't parse " ++ currentPth)
+            exitWith (ExitFailure 1)
+        Just start -> do
+            commit <- getLastCommit start
+            ByteString.writeFile (commitSha commit) (encode commit)
+  where
+    currentPth = pth </> "toggl" </> "current"
+
+data Commit = Commit { commitStart :: DateTime
+                     , commitStop :: DateTime
+                     , commitSha :: String
+                     , commitHeader :: String
+                     , commitRepository :: Maybe Repository
+                     }
+
+instance ToJSON Commit where
+    toJSON Commit{..} = o [ "time_entry" .=
+                            o [ "start" .= fmt commitStart
+                              , "stop" .= fmt commitStop
+                              , "description" .= commitHeader
+                              , "project" .= commitRepository
+                              ]
+                          , "metadata" .=
+                            o [ "commit" .= commitSha
+                              , "repository" .= commitRepository
+                              ]
+                          ]
+      where
+        fmt = timePrint ISO8601_DateAndTime
+        o = object
+
+data Repository = GithubRepository String
+
+instance ToJSON Repository where
+    toJSON (GithubRepository repo) = toJSON repo
+
+getLastCommit :: DateTime -> IO Commit
+getLastCommit start = do
+    (code, out, _) <- readProcessWithExitCode "git" ["log -1"] ""
+    return undefined
 
 removeCurrent :: FilePath -> IO ()
 removeCurrent pth = doesFileExist target >>= \exists ->
