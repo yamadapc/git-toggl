@@ -163,19 +163,18 @@ findCacheFile start = doesFileExist tok >>= \exists ->
     tok = start </> "token"
 
 prepareCommit :: FilePath -> IO ()
-prepareCommit cpth = doesFileExist target >>= \exists -> do
-    mstart <- timeParse ISO8601_DateAndTime <$>
-                readFile target
-
-    when exists $ case mstart of
-        Nothing -> do
-            hPutStrLn stderr ("Couldn't parse " ++ target)
-            exitWith (ExitFailure 1)
-        Just start -> do
-            stop <- timeCurrent
-            let (duration, _) = fromSeconds (timeDiff stop start)
-                sduration = printDuration duration
-            appendFile cpth sduration
+prepareCommit cpth = doesFileExist target >>= \exists ->
+    when exists $ do
+        mstart <- timeParse ISO8601_DateAndTime <$> readFile target
+        case mstart of
+            Nothing -> do
+                hPutStrLn stderr ("Couldn't parse " ++ target)
+                exitWith (ExitFailure 1)
+            Just start -> do
+                stop <- timeCurrent
+                let (duration, _) = fromSeconds (timeDiff stop start)
+                    sduration = printDuration duration
+                appendFile cpth sduration
   where
     dir = takeDirectory cpth </> "toggl"
     target = dir </> "current"
@@ -191,7 +190,7 @@ writeCurrent pth = do
     target = dir </> "current"
 
 persistCurrent :: FilePath -> IO ()
-persistCurrent cpth = do
+persistCurrent cpth = doesFileExist currentPth >>= \exists -> when exists $ do
     mstart <- localTimeParse ISO8601_DateAndTime <$> readFile currentPth
     case mstart of
         Nothing -> do
