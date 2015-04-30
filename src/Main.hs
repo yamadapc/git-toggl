@@ -3,17 +3,23 @@
 {-# LANGUAGE RecordWildCards #-}
 import Control.Monad (unless, when)
 import Data.Aeson
-import qualified Data.ByteString.Lazy as ByteString
+import Data.Attoparsec.Text
+import qualified Data.ByteString.Lazy as ByteStringL
+import qualified Data.ByteString as ByteStringS
 import Data.Hourglass
 import Data.Int
 import Data.List
-import Options.Applicative
+import Data.Text (Text, unpack)
+import qualified Data.Text as Text (lines)
+import Options.Applicative hiding (Parser)
+import qualified Options.Applicative as Options (Parser)
 import System.Directory
 import System.Exit
 import System.FilePath
 import System.Hourglass
 import System.IO
-import System.Process
+import System.Process (spawnCommand, waitForProcess)
+import System.Process.Text (readProcessWithExitCode)
 
 data TogglAuth = Token String
 
@@ -48,7 +54,7 @@ main = do
                                      "making a commit")
                         <> header "git-toggl - Toggl Time Tracking for Git"
 
-togglOpts :: Parser Options
+togglOpts :: Options.Parser Options
 togglOpts = subparser ( command "init" (info initC
                   ( progDesc "Sets-up everything and starts a new time entry" ))
            <> command "clean" (info cleanC
@@ -184,29 +190,30 @@ writeCurrent pth = do
 
 persistCurrent :: FilePath -> IO ()
 persistCurrent cpth = do
-    mstart <- timeParse ISO8601_DateAndTime <$> readFile currentPth
+    mstart <- localTimeParse ISO8601_DateAndTime <$> readFile currentPth
     case mstart of
         Nothing -> do
             hPutStrLn stderr ("Couldn't parse " ++ currentPth)
             exitWith (ExitFailure 1)
         Just start -> do
-            commit <- getLastCommit start
-            ByteString.writeFile (commitSha commit) (encode commit)
+            commit <- getLastCommit currentPth start
+            ByteStringL.writeFile (unpack (commitSha commit)) (encode commit)
   where
     currentPth = takeDirectory cpth </> "toggl" </> "current"
 
-data Commit = Commit { commitStart :: DateTime
-                     , commitStop :: DateTime
-                     , commitSha :: String
-                     , commitHeader :: String
+data Commit = Commit { commitStart :: LocalTime DateTime
+                     , commitStop :: LocalTime DateTime
+                     , commitSha :: Text
+                     , commitMessage :: Text
                      , commitRepository :: Maybe Repository
+                     , commitAuthor :: Text
                      }
 
 instance ToJSON Commit where
     toJSON Commit{..} = o [ "time_entry" .=
                             o [ "start" .= fmt commitStart
                               , "stop" .= fmt commitStop
-                              , "description" .= commitHeader
+                              , "description" .= head (Text.lines commitMessage)
                               , "project" .= commitRepository
                               ]
                           , "metadata" .=
@@ -215,7 +222,7 @@ instance ToJSON Commit where
                               ]
                           ]
       where
-        fmt = timePrint ISO8601_DateAndTime
+        fmt = localTimePrint ISO8601_DateAndTime
         o = object
 
 data Repository = GithubRepository String
@@ -223,10 +230,49 @@ data Repository = GithubRepository String
 instance ToJSON Repository where
     toJSON (GithubRepository repo) = toJSON repo
 
-getLastCommit :: DateTime -> IO Commit
-getLastCommit start = do
-    (code, out, _) <- readProcessWithExitCode "git" ["log -1"] ""
-    return undefined
+getLastCommit :: FilePath -> LocalTime DateTime -> IO Commit
+getLastCommit gitPth start = do
+    (code, msg, _) <- readProcessWithExitCode "git" ["log", "-1", "--date=iso8601"] ""
+    case code of
+        ExitSuccess ->
+            case parseOnly commitMsgParser msg of
+                Left _ -> do
+                    hPutStrLn stderr "Failed to parse last commit message"
+                    exitWith (ExitFailure 1)
+                Right (sha, author, stop, message) ->
+                    return Commit { commitRepository = Just (GithubRepository gitPth)
+                                  , commitStart = start
+                                  , commitStop = stop
+                                  , commitSha = sha
+                                  , commitMessage = message
+                                  , commitAuthor = author
+                                  }
+        ExitFailure c -> do
+            hPutStrLn stderr $
+                "Command `git log -1` failed with non-zero exit code - " ++
+                show c
+            exitWith (ExitFailure 1)
+
+commitMsgParser :: Parser (Text, Text, LocalTime DateTime, Text)
+commitMsgParser = do
+    _ <- string "commit "
+    sha <- takeLine
+    _ <- endOfLine
+    _ <- string "Author: "
+    author <- takeLine
+    _ <- string "Date:   "
+    sstop <- takeLine
+    message <- consumePadded
+    case localTimeParse ISO8601_DateAndTime (unpack sstop) of
+        Nothing -> fail "Failed to parse"
+        Just stop -> return (sha, author, stop, message)
+  where
+    takeLine = takeTill isEndOfLine
+    consumePadded = do
+        skipSpace
+        takeLine
+
+
 
 removeCurrent :: FilePath -> IO ()
 removeCurrent pth = doesFileExist target >>= \exists ->
