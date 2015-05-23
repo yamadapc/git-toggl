@@ -6,12 +6,10 @@ import Control.Monad (unless, when)
 import qualified Data.Aeson as Aeson (encode)
 import Data.Attoparsec.Text
 import qualified Data.ByteString.Lazy as ByteStringL
-import qualified Data.ByteString as ByteStringS
 import Data.Hourglass
 import Data.Int
 import Data.List (isInfixOf)
 import Data.Text (Text, unpack)
-import qualified Data.Text as Text (lines, words)
 import System.Directory
 import System.Exit
 import System.FilePath
