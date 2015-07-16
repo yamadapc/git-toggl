@@ -2,6 +2,14 @@ git-toggl
 =========
 Work-in-progress `git` plugin for Toggl.
 
+## Roadmap
+- [x] Login to Toggl API
+- [x] Write a timestamp on `git toggl init`
+- [x] Read/parse the timestamp pre-commit
+- [ ] Polish
+- [ ] Push a time-entry after the commit, using the timestamp and the commit
+  message
+- [ ] Think about clever ways to infer time spend on commits
 
 ## Time formats
 - [ ] Decimal (1.2h)
