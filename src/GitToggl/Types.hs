@@ -43,3 +43,7 @@ data Repository = GithubRepository String
 
 instance ToJSON Repository where
     toJSON (GithubRepository repo) = toJSON repo
+
+data TogglTimeFormat = Improved
+                     | Classic
+                     | Decimal
